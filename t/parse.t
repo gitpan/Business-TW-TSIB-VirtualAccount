@@ -18,14 +18,14 @@ open my $fh,'>','tmp.dat';
 print $fh $content;
 close $fh ;
 
-open my $fh , '<', 'tmp.dat';
-my $entries = Business::TW::TSIB::VirtualAccount->parse_summary( $fh );
+open my $fh2, '<', 'tmp.dat';
+my $entries = Business::TW::TSIB::VirtualAccount->parse_summary( $fh2);
 #use Data::Dumper::Simple;
 #warn Dumper( $entries );
 is( $entries->[0]->seqno , 1 );
 is( $entries->[0]->amount , 1000 );
 is( $entries->[1]->date , '2006/01/27' );
 is( $entries->[1]->virtualaccount , '9528609220892' );
-close $fh;
+close $fh2;
 
 unlink 'tmp.dat';

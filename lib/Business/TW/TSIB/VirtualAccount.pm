@@ -10,11 +10,11 @@ Business::TW::TSIB::VirtualAccount - Module for Taishin Bank Virtual Account Man
 
 =head1 VERSION
 
-Version 0.02
+Version 0.03
 
 =cut
 
-our $VERSION = '0.02';
+our $VERSION = '0.03';
 
 =head1 SYNOPSIS
 
@@ -39,8 +39,19 @@ our $VERSION = '0.02';
     # postive
     # orig_bank
 
-=cut
+=head1 DESCRIPTION
 
+This module provides utility functions for the virtual account service
+by TSIB (Taishin International Bank, Taiwan).
+
+=head1 METHODS
+
+=head2 new( { corp_code => $corp_code} )
+
+Initialize the virtual account context with C<corp_code> provided by
+TSIB.
+
+=cut
 
 sub new {
     my $class = shift;
@@ -52,6 +63,28 @@ sub new {
 
     return bless $self , $class;
 }
+
+=head2 $va->generate( $args )
+
+Generate a virtual account with the given arguments.  $args is a hash ref and must contain:
+
+=over
+
+=item due
+
+A L<DateTime> object for due day of the payment
+
+=item amount
+
+The expected amount of the transaction.
+
+=item ar_id
+
+The arbitary account receivable identifier.
+
+=back
+
+=cut
 
 sub generate {
     my $self = shift;
@@ -67,7 +100,7 @@ sub generate {
 
     die("Account Generation Error") if ( length($account) != 13 );
 
-    return $self->_gen_checksum( $account , $args ); 
+    return $self->_gen_checksum( $account , $args );
 }
 
 
@@ -83,7 +116,7 @@ sub _gen_checksum {
     map {
         $amount_code += ( ( $as[$_] || 0 ) + ( $as[ 6 - $_ ] || 0 ) ) * ( 5 - $_ )
     } ( 0, 1, 2 );
-    $amount_code += $as[3] * 2;
+    $amount_code += ( $as[3] || 0 ) * 2;
 
     # gen checksum
     my @c = split( //, $account );
@@ -100,8 +133,9 @@ sub _gen_checksum {
 
 }
 
-# entries is arrayref of Business::TW::TSIB::VirtualAccount::Entry objects,
-#  which has the following accessors:
+=head2 $self->parse_summary($fh)
+
+=cut
 
 sub parse_summary {
     my $class = shift;
@@ -116,8 +150,6 @@ sub parse_summary {
     }
     return \@entries;
 }
-
-
 
 =head1 AUTHOR
 
@@ -164,7 +196,7 @@ L<http://search.cpan.org/dist/Business-TW-TSIB-VirtualAccount>
 
 =head1 COPYRIGHT & LICENSE
 
-Copyright 2007 Chia-liang Kao , Yo-Ann Lin , all rights reserved.
+Copyright 2007 AIINK co., ltd, all rights reserved.
 
 This program is free software; you can redistribute it and/or modify it
 under the same terms as Perl itself.

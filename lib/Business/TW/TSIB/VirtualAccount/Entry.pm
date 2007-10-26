@@ -2,7 +2,7 @@ package Business::TW::TSIB::VirtualAccount::Entry;
 use strict;
 use warnings;
 
-use base qw(Class::Accessor);
+use base qw(Class::Accessor::Fast);
 __PACKAGE__->mk_accessors( qw(seqno date amount virtualaccount ar_id code postive orig_bank) );
 
 # columns
