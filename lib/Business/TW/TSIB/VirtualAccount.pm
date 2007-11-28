@@ -14,15 +14,15 @@ Version 0.03
 
 =cut
 
-our $VERSION = '0.03';
+our $VERSION = '0.04';
 
 =head1 SYNOPSIS
 
     use Business::TW::TSIB::VirtualAccount;
-    my $va  = Business::TW::TSIB::VirtualAccount->new({ corp_code => '9528' });
+    my $va  = Business::TW::TSIB::VirtualAccount->new({ corp_code => '95678' });
     my $acc = $va->generate( { due    => DateTime->new( year => 2007, month => 4, day => 2 )
                                amount => 3900,
-                               ar_id  => '20892' } );
+                               ar_id  => '2089' } );
     # $acc should be '95286092208929'  
     # total 14 columns
     
@@ -30,14 +30,23 @@ our $VERSION = '0.03';
 
     # entries is arrayref of Business::TW::TSIB::VirtualAccount::Entry objects,
     # which has the following accessors:
-    # seqno
-    # date
-    # amount
-    # virtualaccount
-    # ar_id
-    # code
-    # postive
-    # orig_bank
+
+       * response_code
+       * account
+       * date
+       * seqno
+       * flag
+       * time
+       * txn_type
+       * amount
+       * postive
+       * entry_type
+       * virtual_account
+       * id
+       * from_bank
+       * comment
+       * preserved
+       * status
 
 =head1 DESCRIPTION
 
@@ -55,13 +64,16 @@ TSIB.
 
 sub new {
     my $class = shift;
-    my $args = shift;
-    my $self = {};
-    die("No Given Corperation Code") if ( ! exists( $args->{corp_code} ));
+    my $args  = shift;
+    my $self  = {};
+    die("No Given Corperation Code") 
+        if ( !exists( $args->{corp_code} ) );
+
+    die("Coperation code needs 5 columns")
+        if ( length( "$args->{corp_code}" ) != 5 );
 
     $self->{corp_code} = $args->{corp_code};
-
-    return bless $self , $class;
+    return bless $self, $class;
 }
 
 =head2 $va->generate( $args )
@@ -90,19 +102,48 @@ sub generate {
     my $self = shift;
     my $args = shift;
 
-    map { die("No Given $_") if ( !exists( $args->{$_} ) ) } qw/due amount ar_id/;
+    map { die("No Given $_") if ( !exists( $args->{$_} ) ) }
+        qw/due amount ar_id/;
 
-    # gen account
-    my $date_code = sprintf( "%d%03d",
-        ( $args->{due}->year - 1 ) % 10,
-        $args->{due}->day_of_year );
-    my $account = $self->{corp_code} . $date_code . $args->{ar_id} ;
+    die("ar_id needs 4 columns") if ( length("$args->{ar_id}") != 4 ) ;
 
-    die("Account Generation Error") if ( length($account) != 13 );
+    # generate account
+    #
+    # format:
+    # | corp_code ( 5 ) | date_code ( 4 ) | ar_id ( 4 ) | checksum ( 1 ) |
+    #
+    # total 14 columns
 
-    return $self->_gen_checksum( $account , $args );
+    my $account
+        = $self->{corp_code}
+        . $self->_gen_datecode($args)
+        . $args->{ar_id};    # 13 columns
+    
+    die('Error: Column lenght of account don\'t correspond to 13') 
+        if ( length($account) != 13 );
+
+    return $self->_gen_checksum( $account, $args );  # 14 columns , checksum appended
 }
 
+sub _gen_datecode {
+    my $self = shift;
+    my $args = shift;
+    return sprintf( "%d%03d",
+        ( $args->{due}->year - 1 ) % 10,
+        $args->{due}->day_of_year );
+}
+
+sub _get_amountcode {
+    my $self = shift;
+    my $args = shift;
+    my @as = reverse split( //, "$args->{amount}" );
+    my $amount_code = 0;
+    map {
+        $amount_code += ( ( $as[$_] || 0 ) + ( $as[ 6 - $_ ] || 0 ) ) * ( 5 - $_ )
+    } ( 0, 1, 2 );
+    $amount_code += ( $as[3] || 0 ) * 2;
+    return $amount_code;
+}
 
 sub _gen_checksum {
     my $self    = shift;
@@ -110,25 +151,19 @@ sub _gen_checksum {
     my $args    = shift;
 
     # gen amount code
-    my @as = reverse split( //, "$args->{amount}" );
-
-    my $amount_code = 0;
-    map {
-        $amount_code += ( ( $as[$_] || 0 ) + ( $as[ 6 - $_ ] || 0 ) ) * ( 5 - $_ )
-    } ( 0, 1, 2 );
-    $amount_code += ( $as[3] || 0 ) * 2;
+    my $amount_code = $self->_get_amountcode( $args );
 
     # gen checksum
     my @c = split( //, $account );
-    die('Wrong Account') if ( $#c + 1 != 13 );
-
     my @c_odd = @c[ 0, 2, 4, 6, 8, 10, 12 ];
     my @c_even = @c[ 1, 3, 5, 7, 9, 11 ];
-
     my ( $sum_odd, $sum_even ) = ( 0, 0 );
     map { $sum_odd  += $_; } @c_odd;
     map { $sum_even += $_; } @c_even;
-    my $checksum = 10 - ( ( $sum_odd * 3 + $sum_even + $amount_code ) % 10 );
+    my $checksum = $sum_odd * 3 + $sum_even + $amount_code ;
+    $checksum %= 10;        # mod
+    $checksum = 10 - $checksum;   # 10's complement
+    $checksum = 0 if ( $checksum == 10 );
     return $account . $checksum;
 
 }
@@ -138,15 +173,80 @@ sub _gen_checksum {
 =cut
 
 sub parse_summary {
-    my $class = shift;
-    my $fh = shift;
+    my $self = shift;
+    my $fh   = shift;
+
+    # format:
+    #
+    # 4     # response code
+    # 14    # account
+    # 8     # date
+    # 6     # sequence number (seqno)
+    # 1     # flag
+    # 6     # time
+    # 4     # transaction type
+    # 12    # amount
+    # 1     # postive
+    # 1     # entry type
+    # 16    # virtual account
+    # 10    # ID Card
+    # 3     # from bank
+    # 20    # comment
+    # 18    # preserve
+    # 1     # status
 
     my @entries;
-    while( <$fh> ) {
-        my %col_hash = ();
-        @col_hash{qw(seqno date amount virtualaccount ar_id code postive orig_bank)} = split /\s+/;
-        my $entry = Business::TW::TSIB::VirtualAccount::Entry->new( \%col_hash );
-        push @entries , $entry;
+    while (<$fh>) {
+        chomp;
+        next unless length $_;
+
+        my %cols;
+
+        @cols{
+            qw/
+                response_code
+                account
+                date
+                seqno
+                flag
+                time
+                txn_type
+                amount
+                postive
+                entry_type
+                virtual_account
+                id
+                from_bank
+                comment
+                preserved
+                status/
+            }
+            = (
+            m/
+                (.{4})       # response code         
+                (.{14})      # account               
+                (.{8})       # date              
+                (.{6})       # seqno             
+                (.{1})       # flag                
+                (.{6})       # time               
+                (.{4})       # transaction type
+                (.{12})      # amount               
+                (.{1})       # postive                 
+                (.{1})       # entry type           
+                (.{16})      # virtual account       
+                (.{10})      # ID Card              
+                (.{3})       # from_bank                
+                (.{20})      # comment               
+                (.{18})      # preserve              
+                (.{1})       # status               
+            /x
+            );
+
+        # trim
+        map { $cols{$_} =~ s/\s*$//g; $cols{$_} =~ s/^\s*//g; } keys %cols;
+        $cols{amount} /= 10;
+        my $entry = Business::TW::TSIB::VirtualAccount::Entry->new( \%cols );
+        push @entries, $entry;
     }
     return \@entries;
 }

@@ -3,24 +3,36 @@ use strict;
 use warnings;
 
 use base qw(Class::Accessor::Fast);
-__PACKAGE__->mk_accessors( qw(seqno date amount virtualaccount ar_id code postive orig_bank) );
-
-# columns
-#
-# seqno             C
-# date              C
-# amount            N
-# virtualaccount    C
-# ar_id             C
-# code              C
-# postive           C
-# orig_bank         C
+__PACKAGE__->mk_accessors(
+    qw(
+    response_code
+    account
+    date 
+    seqno 
+    flag 
+    time 
+    txn_type 
+    amount 
+    postive 
+    entry_type 
+    virtual_account 
+    id 
+    from_bank 
+    comment 
+    preserved 
+    status
+    )
+);
 
 sub new {
     my $class = shift;
     my $self = shift;
-    $self->{amount} = int( $self->{amount} );
     return bless $self , $class;
+}
+
+sub ar_id {
+    my $self = shift;
+    return substr( $self->{virtual_account} , 9 , 4 );
 }
 
 1;

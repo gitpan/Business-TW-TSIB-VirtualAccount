@@ -1,6 +1,6 @@
 --- #YAML:1.0
 name:                Business-TW-TSIB-VirtualAccount
-version:             0.03
+version:             0.04
 abstract:            Module for Taishin Bank Virtual Account Management
 license:             ~
 generated_by:        ExtUtils::MakeMaker version 6.36

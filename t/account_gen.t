@@ -9,15 +9,15 @@ diag( "Testing Business::TW::TSIB::VirtualAccount $Business::TW::TSIB::VirtualAc
 
 use DateTime;
 my $va = Business::TW::TSIB::VirtualAccount->new(
-    { corp_code => '9528' } );
+    { corp_code => '95678' } );
 
 my $acc = $va->generate(
     {   due    => DateTime->new( year => 2007, month => 4, day => 2 ),
         amount => 3900,
-        ar_id  => '20892'
+        ar_id  => '2089'
     }
 );
 
 # total 14 columns
-is( $acc , '95286092208929' );
+is( $acc , '95678609220898' );
 
