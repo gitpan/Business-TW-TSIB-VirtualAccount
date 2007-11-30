@@ -7,9 +7,11 @@ generated_by:        ExtUtils::MakeMaker version 6.36
 distribution_type:   module
 requires:     
     Class::Accessor:               0
+    Class::Accessor::Fast:         0
+    DataTime:                      0
     Test::More:                    0
 meta-spec:
     url:     http://module-build.sourceforge.net/META-spec-v1.2.html
     version: 1.2
 author:
-    - You-An Lin <c9s@aiink.com>
+    - Cornelius <c9s@aiink.com>
